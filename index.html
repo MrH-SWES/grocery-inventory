@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grocery Inventory</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -189,6 +190,43 @@
             cursor: pointer;
             z-index: 100;
         }
+        
+        .scanner-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .scanner-modal.active {
+            display: flex;
+        }
+        
+        #scanner-container {
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .scanner-controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .scanner-controls button {
+            background: white;
+            color: #333;
+            margin: 0 8px;
+        }
     </style>
 </head>
 <body>
@@ -211,6 +249,7 @@
                             <label>Barcode (optional)</label>
                             <div style="display: flex; gap: 8px;">
                                 <input type="text" id="barcode" placeholder="Scan or type barcode">
+                                <button type="button" class="btn-secondary" id="scan-btn" style="white-space: nowrap;">📷 Scan</button>
                                 <button type="button" class="btn-secondary" id="lookup-btn" style="white-space: nowrap;">Lookup</button>
                             </div>
                             <small style="color: #666; font-size: 12px;">Leave blank for items without barcodes</small>
@@ -351,6 +390,14 @@ Here's my inventory:</textarea>
         </div>
         
         <button class="fab" id="add-btn">+</button>
+    </div>
+    
+    <!-- Barcode Scanner Modal -->
+    <div id="scanner-modal" class="scanner-modal">
+        <div id="scanner-container"></div>
+        <div class="scanner-controls">
+            <button onclick="closeScanner()">Cancel</button>
+        </div>
     </div>
     
     <script>
@@ -498,6 +545,65 @@ Here's my inventory:</textarea>
                 handleSubmit(e);
             }
         });
+        
+        // Barcode scanner
+        let html5QrCode;
+        
+        function openScanner() {
+            const modal = document.getElementById('scanner-modal');
+            modal.classList.add('active');
+            
+            html5QrCode = new Html5Qrcode("scanner-container");
+            
+            const config = { 
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                formatsToSupport: [
+                    Html5QrcodeSupportedFormats.EAN_13,
+                    Html5QrcodeSupportedFormats.EAN_8,
+                    Html5QrcodeSupportedFormats.UPC_A,
+                    Html5QrcodeSupportedFormats.UPC_E,
+                    Html5QrcodeSupportedFormats.CODE_128,
+                    Html5QrcodeSupportedFormats.CODE_39
+                ]
+            };
+            
+            html5QrCode.start(
+                { facingMode: "environment" },
+                config,
+                (decodedText, decodedResult) => {
+                    // Success! Fill in the barcode and close scanner
+                    document.getElementById('barcode').value = decodedText;
+                    closeScanner();
+                    
+                    // Optionally auto-trigger lookup
+                    document.getElementById('lookup-btn').click();
+                },
+                (errorMessage) => {
+                    // Scanning errors are normal, just ignore
+                }
+            ).catch(err => {
+                console.error('Scanner error:', err);
+                alert('Could not access camera. Please check permissions.');
+                closeScanner();
+            });
+        }
+        
+        function closeScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('scanner-modal').classList.remove('active');
+                }).catch(err => {
+                    console.error('Error stopping scanner:', err);
+                    document.getElementById('scanner-modal').classList.remove('active');
+                });
+            } else {
+                document.getElementById('scanner-modal').classList.remove('active');
+            }
+        }
+        
+        // Scan button click
+        document.getElementById('scan-btn').addEventListener('click', openScanner);
         
         // Voice inventory functions
         function copyPrompt() {
